@@ -111,7 +111,7 @@ gulp.task('styles', function() {
         .pipe(gulp.dest(config.styles.dist))
 });
 
-gulp.task('webserver', ['watch'], function() {
+gulp.task('serve', ['watch'], function() {
     gulp.src('dist')
         .pipe(webserver({
             livereload: true,
