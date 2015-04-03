@@ -1,4 +1,5 @@
-var React = require('react');
+import React from "react";
+import Example from "./example.js"
 
 var App = React.createClass({
     render() {

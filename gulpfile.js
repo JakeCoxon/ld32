@@ -99,7 +99,6 @@ gulp.task('markup', function() {
 
 gulp.task('js', function() {
     return gulp.src(config.js.entry)
-        .pipe(plumber())
         .pipe(babel(assign({}, config.babel, { modules:'common' })))
         .pipe(webpack(config.webpack))
         .pipe(gulp.dest(config.js.dist));
@@ -115,7 +114,6 @@ gulp.task('serve', ['watch'], function() {
     gulp.src('dist')
         .pipe(webserver({
             livereload: true,
-            open: true
         }));
 });
 
