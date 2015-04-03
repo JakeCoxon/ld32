@@ -11,7 +11,7 @@ var App = React.createClass({
 });
 
 function render() {
-    React.renderComponent(
+    React.render(
         <App />,
         document.getElementById('content'));
 }

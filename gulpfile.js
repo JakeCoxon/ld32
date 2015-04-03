@@ -1,80 +1,129 @@
-var source = require('vinyl-source-stream');
 var gulp = require('gulp');
-var gutil = require('gulp-util');
-var browserify = require('browserify');
-var reactify = require('reactify');
-var watchify = require('watchify');
-var notify = require("gulp-notify");
+var changed = require('gulp-changed');
+var plumber = require('gulp-plumber');
+var less = require('gulp-less');
+var babel = require('gulp-babel');
+var webpack = require('gulp-webpack');
+var watch = require('gulp-watch');
+var webserver = require('gulp-webserver');
+var jshint = require('gulp-jshint');
 
-var scriptsDir = './app/js/';
-var buildDir = './dist';
+var assign = Object.assign || require('object.assign');
+var stylish = require('jshint-stylish');
+var del = require('del');
+var vinylPaths = require('vinyl-paths');
+var LessPluginAutoPrefix = require('less-plugin-autoprefix');
 
-var htmlFiles = 'app/**/*.html';
 
-// Create a transformation function that uses reactify
-// and adds ES6 support
-function reactifyES6(file) {
-    return reactify(file, {'es6': true});
-}
+var config = {
+    js: {
+        entry: 'src/js/app.js',
+        watch: 'src/js/**/*.js',
+        dist: 'dist',
+    },
 
-function notifyGeneratedFile() {
-    return notify({
-        message: "Generated file: <%= file.relative %> @ <%= options.date %>",
-        templateOptions: {
-            date: new Date()
+    markup: {
+        src: 'src/*.html',
+        watch: 'src/**/*.html',
+        dist: 'dist',
+    },
+
+    styles: {
+        src: 'src/css/main.less',
+        watch: 'src/css/**/*.less',
+        dist: 'dist'
+    },
+
+    webpack: {
+        output: {
+            filename: 'app.js',
+            sourceMapFilename: '[file].map'
+        },
+        module: {
+            loaders: [
+                { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader"}
+            ]
         }
-    })
-}
+    },
 
-// Based on: http://blog.avisi.nl/2014/04/25/how-to-keep-a-fast-build-with-browserify-and-reactjs/
-function buildScript(file, watch) {
+    babel: {
+        filename: '',
+        filenameRelative: '',
+        blacklist: [],
+        whitelist: [],
+        modules: '',
+        sourceMap: false,
+        sourceMapName: '',
+        sourceRoot: '',
+        moduleRoot: '',
+        moduleIds: false,
+        experimental: false,
+        format: {
+            comments: false,
+            compact: false,
+            indent: {
+                parentheses: true,
+                adjustMultilineComment: true,
+                style: "  ",
+                base: 0
+            }
+        }
+    },
 
-    var browserifyOptions = watchify.args;
-    browserifyOptions.entries = [scriptsDir + '/' + file];
-    browserifyOptions.debug = true;
-    
-    var bundler = watch ? watchify(browserify(browserifyOptions)) : browserify(browserifyOptions);
-    
-    // Add the reactify transformation
-    bundler.transform(reactifyES6);
-  
-    function rebundle() {
-        var stream = bundler.bundle();
-        return stream.on('error', 
-            notify.onError({
-                title: "Compile Error",
-                message: "<%= error.message %>"
-            }))
-            .pipe(source(file))
-            .pipe(gulp.dest(buildDir + '/'))
-            .pipe(notifyGeneratedFile())
-            ;
+    less: {
+        // Array of paths to be used for @import directives
+        paths: [ 'src/css/' ],
+        plugins: [
+            new LessPluginAutoPrefix({
+                browsers: ["> 5%"]
+            })
+        ]
     }
-    bundler.on('update', function() {
-        rebundle();
-        gutil.log('Rebundle...');
-    });
-    return rebundle();
-}
 
-function initWatch(files, task) {
-    gulp.start(task);
-    gulp.watch(files, [task]);
-}
+};
 
-gulp.task('html', function () {
-    return gulp.src(htmlFiles).
-        pipe(gulp.dest(buildDir));
+
+
+gulp.task('clean', function() {
+    return gulp.src([
+            config.markup.dist,
+            config.js.dist,
+            config.styles.dist ])
+        .pipe(vinylPaths(del));
 });
 
-gulp.task('build', function() {
-    initWatch(htmlFiles, 'html');
-    return buildScript('app.js', false);
+gulp.task('markup', function() {
+    return gulp.src(config.markup.src)
+        .pipe(gulp.dest(config.markup.dist))
+})
+
+gulp.task('js', function() {
+    return gulp.src(config.js.entry)
+        .pipe(plumber())
+        .pipe(babel(assign({}, config.babel, { modules:'common' })))
+        .pipe(webpack(config.webpack))
+        .pipe(gulp.dest(config.js.dist));
 });
 
-
-gulp.task('default', ['build'], function() {
-    initWatch(htmlFiles, 'html');
-    return buildScript('app.js', true);
+gulp.task('styles', function() {
+    return gulp.src(config.styles.src)
+        .pipe(less(config.less))
+        .pipe(gulp.dest(config.styles.dist))
 });
 
+gulp.task('webserver', ['watch'], function() {
+    gulp.src('dist')
+        .pipe(webserver({
+            livereload: true,
+            open: true
+        }));
+});
+
+gulp.task('watch', function() {
+    gulp.watch(config.markup.watch, ['markup']);
+    gulp.watch(config.js.watch, ['js']);
+    gulp.watch(config.styles.watch, ['styles']);
+});
+
+gulp.task('default', ['js', 'markup', 'styles'], function () {
+});

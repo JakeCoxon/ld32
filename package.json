@@ -3,16 +3,29 @@
   "version": "0.0.4",
   "dependencies": {},
   "devDependencies": {
-    "react": "^0.12.0",
-
-    "browserify": "^6.0.0",
-    "gulp": "^3.8.7",
+    "babel-core": "^4.7.16",
+    "babel-loader": "^4.3.0",
+    "del": "^1.1.0",
+    "gulp": "^3.8.10",
+    "gulp-babel": "^4.0.0",
+    "gulp-changed": "^1.1.0",
+    "gulp-jshint": "^1.9.0",
+    "gulp-less": "^3.0.2",
     "gulp-notify": "^2.0.1",
+    "gulp-plumber": "^0.6.6",
+    "gulp-sourcemaps": "^1.3.0",
     "gulp-util": "^3.0.1",
+    "gulp-watch": "^4.2.2",
+    "gulp-webpack": "^1.3.1",
+    "gulp-webserver": "^0.9.0",
+    "jshint-stylish": "^1.0.0",
+    "less-plugin-autoprefix": "^1.4.1",
+    "object.assign": "^1.0.3",
+    "react": "^0.12.0",
     "reactify": "^0.17.1",
-    "uglify-js": "^2.4.13",
-    "vinyl-source-stream": "^1.0.0",
-    "watchify": "^2.0.0"
+    "run-sequence": "^1.0.2",
+    "vinyl-paths": "^1.0.0",
+    "webpack": "^1.7.3"
   },
   "engines": {
     "node": ">=0.10.0"
