@@ -14,11 +14,13 @@ var del = require('del');
 var vinylPaths = require('vinyl-paths');
 var LessPluginAutoPrefix = require('less-plugin-autoprefix');
 
+var ExtractTextPlugin = require("extract-text-webpack-plugin");
+
 
 var config = {
     js: {
         entry: 'src/js/app.js',
-        watch: 'src/js/**/*.js',
+        watch: 'src/{js/**/*.js,images/**/*.*}',
         dist: 'dist',
     },
 
@@ -28,22 +30,27 @@ var config = {
         dist: 'dist',
     },
 
-    styles: {
-        src: 'src/css/main.less',
-        watch: 'src/css/**/*.less',
-        dist: 'dist'
-    },
-
     webpack: {
         output: {
+            path: require("path").resolve("./dist"),
             filename: 'app.js',
-            sourceMapFilename: '[file].map'
+            sourceMapFilename: '[file].map',
+            publicPath: '/'
         },
         module: {
             loaders: [
-                { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader"}
+                { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader"},
+                {
+                    test: /\.less$/,
+                    loader: ExtractTextPlugin.extract("style-loader", 
+                        "css-loader!less-loader!autoprefixer-loader?browsers=last 2 version")
+                },
+                { test: /\.(png|jpg|svg)$/, loader: 'url-loader?name=images/[name].[ext]&limit=100' }
             ]
-        }
+        },
+        plugins: [
+            new ExtractTextPlugin("[name].css")
+        ]
     },
 
     babel: {
@@ -68,16 +75,6 @@ var config = {
                 base: 0
             }
         }
-    },
-
-    less: {
-        // Array of paths to be used for @import directives
-        paths: [ 'src/css/' ],
-        plugins: [
-            new LessPluginAutoPrefix({
-                browsers: ["> 5%"]
-            })
-        ]
     }
 
 };
@@ -87,8 +84,7 @@ var config = {
 gulp.task('clean', function() {
     return gulp.src([
             config.markup.dist,
-            config.js.dist,
-            config.styles.dist ])
+            config.js.dist ])
         .pipe(vinylPaths(del));
 });
 
@@ -104,13 +100,7 @@ gulp.task('js', function() {
         .pipe(gulp.dest(config.js.dist));
 });
 
-gulp.task('styles', function() {
-    return gulp.src(config.styles.src)
-        .pipe(less(config.less))
-        .pipe(gulp.dest(config.styles.dist))
-});
-
-gulp.task('serve', ['watch'], function() {
+gulp.task('serve', ['default', 'watch'], function() {
     gulp.src('dist')
         .pipe(webserver({
             livereload: true,
@@ -120,8 +110,7 @@ gulp.task('serve', ['watch'], function() {
 gulp.task('watch', function() {
     gulp.watch(config.markup.watch, ['markup']);
     gulp.watch(config.js.watch, ['js']);
-    gulp.watch(config.styles.watch, ['styles']);
 });
 
-gulp.task('default', ['js', 'markup', 'styles'], function () {
+gulp.task('default', ['js', 'markup'], function () {
 });
