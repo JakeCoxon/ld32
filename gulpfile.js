@@ -20,7 +20,7 @@ var ExtractTextPlugin = require("extract-text-webpack-plugin");
 var config = {
     js: {
         entry: 'src/js/app.js',
-        watch: 'src/{js/**/*.js,images/**/*.*}',
+        watch: 'src/**/*.{js,svg,png,jpg,less,css}',
         dist: 'dist',
     },
 
