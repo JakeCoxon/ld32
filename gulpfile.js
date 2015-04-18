@@ -7,6 +7,7 @@ var webpack = require('gulp-webpack');
 var watch = require('gulp-watch');
 var webserver = require('gulp-webserver');
 var jshint = require('gulp-jshint');
+var path = require('path');
 
 var assign = Object.assign || require('object.assign');
 var stylish = require('jshint-stylish');
@@ -30,6 +31,12 @@ var config = {
         dist: 'dist',
     },
 
+    images: {
+        src: 'src/images/**/*.*',
+        watch: 'src/images/**/*.*',
+        dist: 'dist/images',
+    },
+
     webpack: {
         output: {
             path: require("path").resolve("./dist"),
@@ -39,7 +46,7 @@ var config = {
         },
         module: {
             loaders: [
-                { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader"},
+                { test: /\.js$/, exclude: /node_modules|other_modules/, loader: "babel-loader"},
                 {
                     test: /\.less$/,
                     loader: ExtractTextPlugin.extract("style-loader", 
@@ -47,6 +54,11 @@ var config = {
                 },
                 { test: /\.(png|jpg|svg)$/, loader: 'url-loader?name=images/[name].[ext]&limit=100' }
             ]
+        },
+        resolve: {
+            alias: {
+                phaser       : path.join(__dirname, "other_modules/phaser/phaser.js"),
+            }
         },
         plugins: [
             new ExtractTextPlugin("[name].css")
@@ -93,8 +105,14 @@ gulp.task('markup', function() {
         .pipe(gulp.dest(config.markup.dist))
 })
 
+gulp.task('images', function() {
+    return gulp.src(config.images.src)
+        .pipe(gulp.dest(config.images.dist))
+})
+
 gulp.task('js', function() {
     return gulp.src(config.js.entry)
+        .pipe(plumber())
         .pipe(babel(assign({}, config.babel, { modules:'common' })))
         .pipe(webpack(config.webpack))
         .pipe(gulp.dest(config.js.dist));
@@ -110,7 +128,8 @@ gulp.task('serve', ['default', 'watch'], function() {
 gulp.task('watch', function() {
     gulp.watch(config.markup.watch, ['markup']);
     gulp.watch(config.js.watch, ['js']);
+    gulp.watch(config.images.watch, ['images']);
 });
 
-gulp.task('default', ['js', 'markup'], function () {
+gulp.task('default', ['js', 'markup', 'images'], function () {
 });
