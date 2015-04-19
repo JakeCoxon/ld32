@@ -1,6 +1,12 @@
 
 const TILE_SIZE = 64;
+const BROADPHASE_SIZE = 12;
 const GROUND_LEVEL = 576;
+const GROUND_ROTATION = -0.1
+
+import LevelFactory from "./level.js"
+
+const level = new (LevelFactory(TILE_SIZE, BROADPHASE_SIZE))()
 
 var game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', { preload, create, render, update });
 
@@ -12,42 +18,25 @@ function preload() {
 }
 
 
-function createMap(width, height) {
-    const array = [];
+// function createMap(width, height) {
+//     const array = [];
 
-    iterate2d(width, height, (x, y) => {
+//     iterate2d(width, height, (x, y) => {
 
-        const tile = Math.random() > 0.9 ? 1 : 0;
+//         const tile = Math.random() > 0.9 ? 1 : 0;
 
-        array.push(tile);
+//         array.push(tile);
 
-    });
+//     });
 
-    const entities = [];
-
-    for (let i = 0; i < 100; i++ ) {
-        const type = "collectable";
-        const x = Math.floor(Math.random() * width);
-        const y = Math.floor(Math.random() * height);
-        entities.push({ type, x, y });
-    }
-
-    for (let i = 0; i < 100; i++ ) {
-        const type = "enemy";
-        const x = Math.floor(Math.random() * width);
-        const y = Math.floor(Math.random() * height);
-        entities.push({ type, x, y });
-    }
-
-
-    return {
-        width, height,
-        array,
-        entities,
-        get: (x, y) => array[y * width + x],
-        iterate: (f) => iterate2d(width, height, f)
-    };
-}
+    
+//     return {
+//         width, height,
+//         array,
+//         get: (x, y) => array[y * width + x],
+//         iterate: (f) => iterate2d(width, height, f)
+//     };
+// }
 
 function iterate2d(w, h, f) {
     for (let j = 0; j < h; j++) {
@@ -58,10 +47,12 @@ function iterate2d(w, h, f) {
 }
 
 var group, player, floor, jumpKey, attackKey, map, mapSprites, entitySprites
+var collectableBitmap;
 
 function create() {
 
-    map = createMap(200, 10);
+    // map = createMap(200, 10);
+    map = [];
 
     game.stage.backgroundColor = "#3F405F";
 
@@ -77,65 +68,47 @@ function create() {
     bg(2);
     bg(3);
     
-
+    collectableBitmap = createBitmap("#AFD4A9", 10, 10);
 
 
     group = game.add.group();
 
-    mapSprites = {
-        array: new Array(),
-        get: function(x, y) {
-            return this.array[y * map.width + x];
-        }
-    };
+    // mapSprites = {
+    //     array: new Array(),
+    //     get: function(x, y) {
+    //         return this.array[y * map.width + x];
+    //     }
+    // };
 
 
-    map.iterate((x, y, idx) => {
+    // map.iterate((x, y, idx) => {
 
-        const tileId = map.array[idx];
+    //     const tileId = map.array[idx];
 
-        if (tileId == 0) return;
+    //     if (tileId == 0) return;
 
-        const sprite = new Phaser.Sprite(game, x * TILE_SIZE, y * TILE_SIZE, "block");
-        sprite.tint = 0x37345A;
-        group.addChild(sprite);
+    //     const sprite = new Phaser.Sprite(game, x * TILE_SIZE, y * TILE_SIZE, "block");
+    //     sprite.tint = 0x37345A;
+    //     group.addChild(sprite);
 
-        mapSprites.array[idx] = sprite;
+    //     mapSprites.array[idx] = sprite;
 
-    });
+    // });
+
+    level.generate = function(blockX) {
+        return generateAll(blockX);
+    }
 
     const floorBitmap = createBitmap("#37345A", 1, 1)
     floor = new Phaser.Sprite(game, -100, GROUND_LEVEL + 20, floorBitmap);
-    floor.rotation = -0.1;
+    floor.rotation = GROUND_ROTATION;
     floor.width = 1000;
     floor.height = 200;
     game.world.addChild(floor);
 
 
-    entitySprites = new Array(map.entities.length);
+    entitySprites = [];
 
-    const collectableBitmap = createBitmap("#AFD4A9", 10, 10);
-
-    map.entities.forEach((entityDef, idx) => {
-        var entity;
-
-        if (entityDef.type == 'collectable') {
-            entity = new Phaser.Sprite(game, 0, 0, collectableBitmap);
-            entity.rotation = Math.PI/4;
-        }
-        else if (entityDef.type == 'enemy') {
-            entity = new Phaser.Sprite(game, 0, 0, 'enemy');
-            entity.tint = 0xAF5A5A;
-        }
-
-        entity.anchor.set(0.5, 0.5);
-        entity.x = entityDef.x * TILE_SIZE + (TILE_SIZE - 10) / 2;
-        entity.y = entityDef.y * TILE_SIZE + (TILE_SIZE - 10) / 2;
-        group.addChild(entity);
-
-
-        entitySprites[idx] = entity;
-    })
 
 
     player = new Phaser.Sprite(game, 0, GROUND_LEVEL, "player");
@@ -216,6 +189,7 @@ function createPounceEffectSpin(entity, dx, dy, finalScale=2, alpha=0.4) {
 
     const finalX = entity.x + (entity.width - entity.width * finalScale) / 2;
     const finalY = entity.y + (entity.height - entity.height * finalScale);
+
     game.add.tween(spr).to({ 
         scaleXY: finalScale, 
         alpha: 0, 
@@ -252,8 +226,8 @@ function createGlowEffect(entity) {
 function update() {
 
     player.x += 3;
-    player.groundLevel += Math.sin(floor.rotation) * 3;
-    group.y -= Math.sin(floor.rotation) * 3;
+    player.groundLevel += Math.sin(GROUND_ROTATION) * 3;
+    group.y -= Math.sin(GROUND_ROTATION) * 3;
     group.x = -player.x + 100;
 
     if (!player.isOnGround) {
@@ -295,20 +269,6 @@ function update() {
     player.y += player.velocity.y;
 
 
-    map.entities.forEach((entityDef, idx) => {
-        const entity = entitySprites[idx];
-        if (entityDef.type == 'collectable') {
-            if (entity.x > player.x && entity.x < player.x + player.width && 
-                entity.y > player.y && entity.y < player.y + player.height && entity.alive) {
-                entity.scaleXY = 2;
-                createPounceEffectSpin(entity, 0, 0, 3, 1)
-                entity.kill();
-            } 
-        } else if (entityDef.type == 'enemy') {
-            entity.scaleXY = (Math.sin(Date.now() / 100) * 0.5 + 0.5) * 1 + 0.5
-        }
-    });
-
     if (player.glowEffect && player.glowEffect.alive) {
         if (Math.floor(Date.now()) % 2 == 0) {
             player.glowEffect.tint = ((1<<24)*Math.random()|0);
@@ -321,7 +281,129 @@ function update() {
         }
     }
 
+    updateEntities(player.x, (entity) => {
+        if (entity.alive) {
+            if (entity.entityDef.type == 'collectable') {
+                if (entity.x > player.x && entity.x < player.x + player.width && 
+                    entity.y > player.y && entity.y < player.y + player.height && entity.alive) {
+                    entity.scaleXY = 2;
+                    createPounceEffectSpin(entity, 0, 0, 3, 1)
+                    entity.kill();
+                } 
+            } else if (entity.entityDef.type == 'enemy') {
+                entity.scaleXY = (Math.sin(Date.now() / 100) * 0.5 + 0.5) * 0.5 + 0.25;
+                if (entity.x > player.x && entity.x < player.x + player.width && 
+                    entity.y > player.y && entity.y < player.y + player.height) {
+                    entity.tint = 0xffffff;
+                }
+            }
+        }
+    });
 
+}
+
+var currentBroadphaseX = -10;
+var lastBoardphaseX = -10;
+
+function updateEntities(positionX, cbx) {
+
+    level.updatePosition(positionX);
+    entitySprites.forEach((ents, phidx) => {
+        ents.forEach(cbx);
+    });
+}
+
+function generateAll(broadphaseX) {
+    const gen = generateEntities(currentBroadphaseX);
+    const map = generateMap(currentBroadphaseX);
+
+    const entitySprites = new Array(gen.length);
+    const mapSprites = new Array(map.length);
+
+    gen.forEach((entityDef, idx) => {
+        const entity = group.getFirstDead() || new Phaser.Sprite(game, 0, 0, collectableBitmap);
+
+        entity.entityDef = entityDef;
+        if (entityDef.type == 'collectable') {
+            entity.loadTexture(collectableBitmap);
+            entity.rotation = Math.PI/4;
+        }
+        else if (entityDef.type == 'enemy') {
+            entity.loadTexture('enemy');
+            entity.tint = 0xAF5A5A;
+            // entity.blendMode = PIXI.blendModes.ADD
+        }
+
+        entity.anchor.set(0.5, 0.5);
+        entity.x = entityDef.x * TILE_SIZE + (TILE_SIZE - 10) / 2;
+        entity.y = entityDef.y * TILE_SIZE + (TILE_SIZE - 10) / 2;
+        group.addChild(entity);
+
+        entitySprites[idx] = entity;
+
+    });
+
+    map.forEach((tileId, idx) => {
+        if (tileId) {
+
+            const tileSprite = new Phaser.Sprite(game, x * TILE_SIZE, y * TILE_SIZE, "block");
+            tileSprite.tint = 0x37345A;
+            group.addChild(tileSprite);
+
+
+            mapSprites[idx] = tileSprite;
+        }
+    });
+
+    return { entities: entitySprites, map: mapSprites };
+}
+
+function generateMap(broadphaseX) {
+    const height = 10;
+
+    const offsetX = broadphaseX * BROADPHASE_SIZE
+    const offsetY = Math.sin(GROUND_ROTATION) * offsetX;
+
+    const mapArray = [];
+
+    for (let j = offsetX; j < BROADPHASE_SIZE; j++) {
+        for (let i = offsetY; i < 10; i++) {
+            const tile = Math.random() > 0.9 ? 1 : 0;
+            if (tile) {
+                mapArray[j * w + i] = 1;
+            }
+        }
+    }
+
+    return mapArray;
+
+}
+
+
+function generateEntities(broadphaseX) {
+    const height = 10;
+
+    const offsetX = broadphaseX * BROADPHASE_SIZE
+    const offsetY = Math.sin(GROUND_ROTATION) * offsetX;
+
+    const broadphaseEntities = [];
+
+    for (let j = 0; j < 10; j++ ) {
+        const type = "collectable";
+        const x = offsetX + Math.floor(Math.random() * BROADPHASE_SIZE);
+        const y = offsetY + Math.floor(Math.random() * height);
+        broadphaseEntities.push({ type, x, y });
+    }
+
+    for (let j = 0; j < 5; j++ ) {
+        const type = "enemy";
+        const x = offsetX + Math.floor(Math.random() * BROADPHASE_SIZE);
+        const y = offsetY + Math.floor(Math.random() * height);
+        broadphaseEntities.push({ type, x, y });
+    }
+
+
+    return broadphaseEntities;
 }
 
 function render() {
