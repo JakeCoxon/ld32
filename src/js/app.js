@@ -4,7 +4,7 @@ import collision from './collision.js'
 import generateLevel from './level-generator.js'
 
 const TILE_SIZE = 64;
-const GROUND_LEVEL = 512;
+const GROUND_LEVEL = 448;
 const GROUND_ROTATION = -0.1;
 const OFFSET_Y = 50;
 const SPEED = 4;
@@ -266,7 +266,7 @@ function updateScore(entity) {
     document.getElementById('high-score').innerHTML = entity.highScore;
 }
 
-var game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', state);
+var game = new Phaser.Game(800, 550, Phaser.AUTO, 'content', state);
 
 game.state.add('gameplay', state);
 
