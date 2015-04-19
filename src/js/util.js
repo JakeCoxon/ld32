@@ -1,9 +1,16 @@
+function keys(o) {
+    // if (o !== Object(o)) throw new TypeError('Object.keys called on a non-object');
+    var k=[], p;
+    for (p in o) if (Object.prototype.hasOwnProperty.call(o,p)) k.push(p);
+    return k;
+}
+
 Object.defineProperty(Object.prototype, 'forEach', {
     enumerable: false,
     configurable: false,
     writable: true,
     value: function(f) {
-        Object.keys(this).forEach(key => {
+        keys(this).forEach(key => {
             var value = this[key];
             f(value, key);
         });
