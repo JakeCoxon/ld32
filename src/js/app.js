@@ -8,6 +8,7 @@ function preload() {
     game.load.image("player", "images/player.png");
     game.load.image("bg", "images/bg.png");
     game.load.image("block", "images/block.png");
+    game.load.image("enemy", "images/enemy.png");
 }
 
 
@@ -25,10 +26,19 @@ function createMap(width, height) {
     const entities = [];
 
     for (let i = 0; i < 100; i++ ) {
-        var x = Math.floor(Math.random() * width);
-        var y = Math.floor(Math.random() * height);
-        entities.push({ x, y });
+        const type = "collectable";
+        const x = Math.floor(Math.random() * width);
+        const y = Math.floor(Math.random() * height);
+        entities.push({ type, x, y });
     }
+
+    for (let i = 0; i < 100; i++ ) {
+        const type = "enemy";
+        const x = Math.floor(Math.random() * width);
+        const y = Math.floor(Math.random() * height);
+        entities.push({ type, x, y });
+    }
+
 
     return {
         width, height,
@@ -47,7 +57,7 @@ function iterate2d(w, h, f) {
     }
 }
 
-var group, player, floor, jumpKey, map, mapSprites
+var group, player, floor, jumpKey, attackKey, map, mapSprites, entitySprites
 
 function create() {
 
@@ -69,17 +79,11 @@ function create() {
     
 
 
-    const createTile = (color) => createBitmap(color, TILE_SIZE, TILE_SIZE);
-
-    const tiles = [
-        createTile("#111111"),
-        createTile("#37345A")
-    ];
 
     group = game.add.group();
 
     mapSprites = {
-        array: new Array(map.length),
+        array: new Array(),
         get: function(x, y) {
             return this.array[y * map.width + x];
         }
@@ -89,7 +93,6 @@ function create() {
     map.iterate((x, y, idx) => {
 
         const tileId = map.array[idx];
-        const tile = tiles[tileId];
 
         if (tileId == 0) return;
 
@@ -101,20 +104,37 @@ function create() {
 
     });
 
-    floor = new Phaser.Sprite(game, -100, GROUND_LEVEL + 20, tiles[1]);
+    const floorBitmap = createBitmap("#37345A", 1, 1)
+    floor = new Phaser.Sprite(game, -100, GROUND_LEVEL + 20, floorBitmap);
     floor.rotation = -0.1;
     floor.width = 1000;
     floor.height = 200;
     game.world.addChild(floor);
 
 
+    entitySprites = new Array(map.entities.length);
+
     const collectableBitmap = createBitmap("#AFD4A9", 10, 10);
 
-    map.entities.forEach(collectable => {
-        const entity = new Phaser.Sprite(game, 0, 0, collectableBitmap);
+    map.entities.forEach((entityDef, idx) => {
+        var entity;
+
+        if (entityDef.type == 'collectable') {
+            entity = new Phaser.Sprite(game, 0, 0, collectableBitmap);
+            entity.rotation = Math.PI/4;
+        }
+        else if (entityDef.type == 'enemy') {
+            entity = new Phaser.Sprite(game, 0, 0, 'enemy');
+            entity.tint = 0xAF5A5A;
+        }
+
+        entity.anchor.set(0.5, 0.5);
+        entity.x = entityDef.x * TILE_SIZE + (TILE_SIZE - 10) / 2;
+        entity.y = entityDef.y * TILE_SIZE + (TILE_SIZE - 10) / 2;
         group.addChild(entity);
-        entity.x = collectable.x * TILE_SIZE + (TILE_SIZE + 10) / 2;
-        entity.y = collectable.y * TILE_SIZE + (TILE_SIZE + 10) / 2;
+
+
+        entitySprites[idx] = entity;
     })
 
 
@@ -127,8 +147,20 @@ function create() {
     player.groundLevel = GROUND_LEVEL;
     group.addChild(player);
 
+    const glow = createGlowEffect(player)
+    moveSiblingToChild(glow, player);
+    glow.kill();
+
+    const playerClone = player.cloneSprite()
+    moveSiblingToChild(playerClone, player);
+
 
     jumpKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+    attackKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
+
+    attackKey.onDown.add(() => {
+        createGlowEffect(player)
+    })
 
 
    
@@ -149,24 +181,77 @@ Phaser.Sprite.prototype.cloneSprite = function() {
     spr.height = this.height;
     spr.tint = this.tint;
     spr.alpha = this.alpha;
+    spr.scaleXY = this.scaleXY;
+    spr.anchor.set(this.anchor.x, this.anchor.y);
+    spr.rotation = this.rotation;
     this.parent.addChild(spr);
     return spr;
 }
 
-function createPounceEffect(entity, dx, dy) {
+function centerSpriteOnSprite(spr1, spr2) {
+    spr1.x = spr2.x + (spr2.width - spr1.width) / 2;
+    spr1.y = spr2.y + (spr2.height - spr1.height) / 2;
+}
+
+function centerSpriteAt(spr, x, y) {
+    spr.x = x - spr.width / 2;
+    spr.y = y - spr.height / 2;
+}
+
+function createPounceEffect(entity, dx, dy, finalScale=2, alpha=0.4) {
     const spr = entity.pounceEffect || entity.cloneSprite();
-    spr.alpha = 0.4;
+    spr.alpha = alpha;
     spr.scale.set(1);
 
-    const finalScale = 2;
     const finalX = entity.x + (entity.width - entity.width * finalScale) / 2;
     const finalY = entity.y + (entity.height - entity.height * finalScale);
     game.add.tween(spr).to({ scaleXY: finalScale, alpha: 0, x: finalX, y: finalY }, 1000, Phaser.Easing.Circular.Out, true)
 }
 
+function createPounceEffectSpin(entity, dx, dy, finalScale=2, alpha=0.4) {
+    const spr = entity.pounceEffect = entity.pounceEffect || entity.cloneSprite();
+    spr.alpha = alpha;
+    spr.scale.set(1);
+    spr.rotation = 0;
+
+    const finalX = entity.x + (entity.width - entity.width * finalScale) / 2;
+    const finalY = entity.y + (entity.height - entity.height * finalScale);
+    game.add.tween(spr).to({ 
+        scaleXY: finalScale, 
+        alpha: 0, 
+        x: finalX, 
+        y: finalY,
+        rotation: 15
+    }, 1000, Phaser.Easing.Circular.Out, true)
+}
+
+function moveSiblingToChild(sprite, child) {
+    if (sprite.parent !== child.parent) throw "Not siblings";
+    sprite.parent.removeChild(sprite);
+    child.addChild(sprite);
+    sprite.x -= child.x;
+    sprite.y -= child.y;
+}
+
+function createGlowEffect(entity) {
+    const spr = entity.glowEffect = entity.glowEffect || entity.cloneSprite();
+    spr.revive();
+    spr.scaleXY = 3;
+    spr.tint = 0xAF5A5A;
+    spr.alpha = 0.5;
+    centerSpriteAt(spr, entity.width / 2, entity.height / 2)
+
+    game.add.tween(spr).to({ 
+        scaleXY: 4, 
+        alpha: 0, 
+    }, 1000, Phaser.Easing.Circular.Out, true)
+
+    return spr;
+}
+
 function update() {
 
-    player.x += 3;//Math.sin(group.rotation) * 3;
+    player.x += 3;
     player.groundLevel += Math.sin(floor.rotation) * 3;
     group.y -= Math.sin(floor.rotation) * 3;
     group.x = -player.x + 100;
@@ -208,6 +293,34 @@ function update() {
     }
 
     player.y += player.velocity.y;
+
+
+    map.entities.forEach((entityDef, idx) => {
+        const entity = entitySprites[idx];
+        if (entityDef.type == 'collectable') {
+            if (entity.x > player.x && entity.x < player.x + player.width && 
+                entity.y > player.y && entity.y < player.y + player.height && entity.alive) {
+                entity.scaleXY = 2;
+                createPounceEffectSpin(entity, 0, 0, 3, 1)
+                entity.kill();
+            } 
+        } else if (entityDef.type == 'enemy') {
+            entity.scaleXY = (Math.sin(Date.now() / 100) * 0.5 + 0.5) * 1 + 0.5
+        }
+    });
+
+    if (player.glowEffect && player.glowEffect.alive) {
+        if (Math.floor(Date.now()) % 2 == 0) {
+            player.glowEffect.tint = ((1<<24)*Math.random()|0);
+        }
+        // player.glowEffect.alpha = Math.random();
+        // player.glowEffect.scaleXY = (Math.sin(Date.now() / 500) * 0.5 + 0.5) * 1 + 2;
+        centerSpriteAt(player.glowEffect, player.width / 2, player.height / 2);
+        if (player.glowEffect.alpha == 0) {
+            player.glowEffect.kill();
+        }
+    }
+
 
 }
 
