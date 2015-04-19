@@ -9,14 +9,23 @@
   body { 
     margin: 0;
     padding: 0;
-    background: #61756C;
+    background: #37345A;
+    font-family: Arial, Verdana, sans-serif;
+    color: #5A5C7B;
+  }
+  #content canvas {
+    margin: 10px auto 0 auto;
+  }
+  .footer {
+    text-align: center;
   }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/2.3.0/phaser.js"></script>
-  <title>Tower game lol</title>
+  <title>LD32</title>
 </head>
 <body>
   <div id="content"></div>
+  <div class="footer">Space to jump. Your score is <span id="score">0</span>. Highest is <span id="high-score">0</span></div>
   <script src="app.js"></script>
 </body>
 </html>

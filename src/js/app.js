@@ -1,389 +1,274 @@
+import * as util from './util.js'
+import * as effects from './effects.js'
+import collision from './collision.js'
+import generateLevel from './level-generator.js'
 
 const TILE_SIZE = 64;
-const GROUND_LEVEL = 576;
+const GROUND_LEVEL = 512;
+const GROUND_ROTATION = -0.1;
+const OFFSET_Y = 50;
+const SPEED = 4;
 
-var game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', { preload, create, render, update });
-
-function preload() {
-    game.load.image("player", "images/player.png");
-    game.load.image("bg", "images/bg.png");
-    game.load.image("block", "images/block.png");
-    game.load.image("enemy", "images/enemy.png");
-}
+const checkCollisions = collision(TILE_SIZE);
 
 
-function createMap(width, height) {
-    const array = [];
-
-    iterate2d(width, height, (x, y) => {
-
-        const tile = Math.random() > 0.9 ? 1 : 0;
-
-        array.push(tile);
-
-    });
-
-    const entities = [];
-
-    for (let i = 0; i < 100; i++ ) {
-        const type = "collectable";
-        const x = Math.floor(Math.random() * width);
-        const y = Math.floor(Math.random() * height);
-        entities.push({ type, x, y });
-    }
-
-    for (let i = 0; i < 100; i++ ) {
-        const type = "enemy";
-        const x = Math.floor(Math.random() * width);
-        const y = Math.floor(Math.random() * height);
-        entities.push({ type, x, y });
-    }
-
-
-    return {
-        width, height,
-        array,
-        entities,
-        get: (x, y) => array[y * width + x],
-        iterate: (f) => iterate2d(width, height, f)
-    };
-}
-
-function iterate2d(w, h, f) {
-    for (let j = 0; j < h; j++) {
-        for (let i = 0; i < w; i++) {
-            f(i, j, j * w + i);
-        }
-    }
-}
-
-var group, player, floor, jumpKey, attackKey, map, mapSprites, entitySprites
-
-function create() {
-
-    map = createMap(200, 10);
-
-    game.stage.backgroundColor = "#3F405F";
-
-    function bg(idx) {
-        const spr = new Phaser.Sprite(game, 0, 0, "bg");
-        spr.y = game.stage.height - spr.height + idx*50;
-        spr.tint = 0x626382;
-        spr.alpha = 0.3;
-        game.world.addChild(spr);
-    }
-    bg(0);
-    bg(1);
-    bg(2);
-    bg(3);
     
+const state = {
 
+    preload() {
+        game.load.image("player", "images/player.png");
+        game.load.image("bg", "images/bg.png");
+        game.load.image("block", "images/block.png");
+        game.load.image("enemy", "images/enemy.png");
+        game.load.image("enemy2", "images/enemy2.png");
 
-
-    group = game.add.group();
-
-    mapSprites = {
-        array: new Array(),
-        get: function(x, y) {
-            return this.array[y * map.width + x];
-        }
-    };
-
-
-    map.iterate((x, y, idx) => {
-
-        const tileId = map.array[idx];
-
-        if (tileId == 0) return;
-
-        const sprite = new Phaser.Sprite(game, x * TILE_SIZE, y * TILE_SIZE, "block");
-        sprite.tint = 0x37345A;
-        group.addChild(sprite);
-
-        mapSprites.array[idx] = sprite;
-
-    });
-
-    const floorBitmap = createBitmap("#37345A", 1, 1)
-    floor = new Phaser.Sprite(game, -100, GROUND_LEVEL + 20, floorBitmap);
-    floor.rotation = -0.1;
-    floor.width = 1000;
-    floor.height = 200;
-    game.world.addChild(floor);
-
-
-    entitySprites = new Array(map.entities.length);
-
-    const collectableBitmap = createBitmap("#AFD4A9", 10, 10);
-
-    map.entities.forEach((entityDef, idx) => {
-        var entity;
-
-        if (entityDef.type == 'collectable') {
-            entity = new Phaser.Sprite(game, 0, 0, collectableBitmap);
-            entity.rotation = Math.PI/4;
-        }
-        else if (entityDef.type == 'enemy') {
-            entity = new Phaser.Sprite(game, 0, 0, 'enemy');
-            entity.tint = 0xAF5A5A;
-        }
-
-        entity.anchor.set(0.5, 0.5);
-        entity.x = entityDef.x * TILE_SIZE + (TILE_SIZE - 10) / 2;
-        entity.y = entityDef.y * TILE_SIZE + (TILE_SIZE - 10) / 2;
-        group.addChild(entity);
-
-
-        entitySprites[idx] = entity;
-    })
-
-
-    player = new Phaser.Sprite(game, 0, GROUND_LEVEL, "player");
-    player.tint = 0xC4A24D;
-    player.width = 50;
-    player.height = 100;
-    player.velocity = new Phaser.Point(0, 0);
-    player.isOnGround = true;
-    player.groundLevel = GROUND_LEVEL;
-    group.addChild(player);
-
-    const glow = createGlowEffect(player)
-    moveSiblingToChild(glow, player);
-    glow.kill();
-
-    const playerClone = player.cloneSprite()
-    moveSiblingToChild(playerClone, player);
-
-
-    jumpKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
-    attackKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
-
-    attackKey.onDown.add(() => {
-        createGlowEffect(player)
-    })
-
-
-   
-}
-
-Object.defineProperty(Phaser.Sprite.prototype, 'scaleXY', {
-    get: function() {
-        return this.scale.x;
+        game.load.image("player-d1", "images/player-d1.png");
+        game.load.image("player-d2", "images/player-d2.png");
+        game.load.image("player-d3", "images/player-d3.png");
+        game.load.image("player-d4", "images/player-d4.png");
+        game.load.image("player-d5", "images/player-d5.png");
     },
-    set: function(v) {
-        this.scale.set(v, v);
-    }
-});
 
-Phaser.Sprite.prototype.cloneSprite = function() {
-    const spr = new Phaser.Sprite(this.game, this.x, this.y, this.key);
-    spr.width = this.width;
-    spr.height = this.height;
-    spr.tint = this.tint;
-    spr.alpha = this.alpha;
-    spr.scaleXY = this.scaleXY;
-    spr.anchor.set(this.anchor.x, this.anchor.y);
-    spr.rotation = this.rotation;
-    this.parent.addChild(spr);
-    return spr;
-}
+    create() {
 
-function centerSpriteOnSprite(spr1, spr2) {
-    spr1.x = spr2.x + (spr2.width - spr1.width) / 2;
-    spr1.y = spr2.y + (spr2.height - spr1.height) / 2;
-}
+        // var group, player, floor, jumpKey, attackKey, map, mapSprites, entitySprites, isDead
 
-function centerSpriteAt(spr, x, y) {
-    spr.x = x - spr.width / 2;
-    spr.y = y - spr.height / 2;
-}
+        this.isDead = false;
 
-function createPounceEffect(entity, dx, dy, finalScale=2, alpha=0.4) {
-    const spr = entity.pounceEffect || entity.cloneSprite();
-    spr.alpha = alpha;
-    spr.scale.set(1);
+        this.map = generateLevel(200, 8, GROUND_ROTATION);
 
-    const finalX = entity.x + (entity.width - entity.width * finalScale) / 2;
-    const finalY = entity.y + (entity.height - entity.height * finalScale);
-    game.add.tween(spr).to({ scaleXY: finalScale, alpha: 0, x: finalX, y: finalY }, 1000, Phaser.Easing.Circular.Out, true)
-}
+        game.stage.backgroundColor = "#3F405F";
 
-function createPounceEffectSpin(entity, dx, dy, finalScale=2, alpha=0.4) {
-    const spr = entity.pounceEffect = entity.pounceEffect || entity.cloneSprite();
-    spr.alpha = alpha;
-    spr.scale.set(1);
-    spr.rotation = 0;
-
-    const finalX = entity.x + (entity.width - entity.width * finalScale) / 2;
-    const finalY = entity.y + (entity.height - entity.height * finalScale);
-    game.add.tween(spr).to({ 
-        scaleXY: finalScale, 
-        alpha: 0, 
-        x: finalX, 
-        y: finalY,
-        rotation: 15
-    }, 1000, Phaser.Easing.Circular.Out, true)
-}
-
-function moveSiblingToChild(sprite, child) {
-    if (sprite.parent !== child.parent) throw "Not siblings";
-    sprite.parent.removeChild(sprite);
-    child.addChild(sprite);
-    sprite.x -= child.x;
-    sprite.y -= child.y;
-}
-
-function createGlowEffect(entity) {
-    const spr = entity.glowEffect = entity.glowEffect || entity.cloneSprite();
-    spr.revive();
-    spr.scaleXY = 3;
-    spr.tint = 0xAF5A5A;
-    spr.alpha = 0.5;
-    centerSpriteAt(spr, entity.width / 2, entity.height / 2)
-
-    game.add.tween(spr).to({ 
-        scaleXY: 4, 
-        alpha: 0, 
-    }, 1000, Phaser.Easing.Circular.Out, true)
-
-    return spr;
-}
-
-function update() {
-
-    player.x += 3;
-    player.groundLevel += Math.sin(floor.rotation) * 3;
-    group.y -= Math.sin(floor.rotation) * 3;
-    group.x = -player.x + 100;
-
-    if (!player.isOnGround) {
-        if (jumpKey.isDown && player.jumpSpeed > 0) {
-            player.velocity.y -= player.jumpSpeed;
+        function bg(idx) {
+            const spr = new Phaser.Sprite(game, 0, 0, "bg");
+            spr.y = game.stage.height - spr.height + idx*50;
+            spr.tint = 0x626382;
+            spr.alpha = 0.3;
+            game.world.addChild(spr);
         }
-        player.velocity.y += 0.4;
-        player.jumpSpeed -= 0.05;
-        player.airTime ++;
-    } else {
-        player.airTime = 0;
-        player.jumpSpeed = 1;
-    }
+        [0,1,2,3].forEach(bg);
 
 
+        this.group = game.add.group();
+        this.group.y = OFFSET_Y;
 
-    if (jumpKey.isDown && player.isOnGround) {
-        player.isOnGround = false;
-        player.velocity.y = -5;
-        createPounceEffect(player, 0, -1);
-    }
-
-    
+        this.mapSprites = new Array(this.map.width);
 
 
-    const prevY = player.y;
-    const newY = player.y + player.velocity.y;
+        this.map.iterate((x, y, idx) => {
 
-    const collision = checkCollisions(map, prevY, newY, player);
-    if (collision.isCollision) {
-        player.y = collision.y - player.height;
-        player.velocity.y = 0;
-        player.isOnGround = true;
+            const tileId = this.map.get(x, y);
 
-    } else {
-        player.isOnGround = false;
-    }
+            if (tileId == 0) return;
 
-    player.y += player.velocity.y;
+            const sprite = new Phaser.Sprite(game, x * TILE_SIZE, y * TILE_SIZE, "block");
+            sprite.tint = 0x37345A;
+            this.group.addChild(sprite);
+
+            if (!this.mapSprites[x]) {
+                this.mapSprites[x] = [];
+            }
+            this.mapSprites[x][y] = sprite;
+
+        });
+
+        const floorBitmap = util.createBitmap(this.game, "#37345A", 1, 1)
+        this.floor = new Phaser.Sprite(this.game, -100, GROUND_LEVEL + 20 + OFFSET_Y, floorBitmap);
+        this.floor.rotation = -0.1;
+        this.floor.width = 1000;
+        this.floor.height = 200;
+        this.game.world.addChild(this.floor);
 
 
-    map.entities.forEach((entityDef, idx) => {
-        const entity = entitySprites[idx];
-        if (entityDef.type == 'collectable') {
-            if (entity.x > player.x && entity.x < player.x + player.width && 
-                entity.y > player.y && entity.y < player.y + player.height && entity.alive) {
-                entity.scaleXY = 2;
-                createPounceEffectSpin(entity, 0, 0, 3, 1)
-                entity.kill();
-            } 
-        } else if (entityDef.type == 'enemy') {
-            entity.scaleXY = (Math.sin(Date.now() / 100) * 0.5 + 0.5) * 1 + 0.5
+        this.entitySprites = new Array(this.map.entities.length);
+
+        const collectableBitmap = util.createBitmap(this.game, "#AFD4A9", 10, 10);
+
+        this.map.entities.forEach((entityDef, idx) => {
+            var entity;
+
+            if (entityDef.type == 'point') {
+                entity = new Phaser.Sprite(this.game, 0, 0, collectableBitmap);
+                entity.rotation = Math.PI/4;
+            }
+            else if (entityDef.type == 'enemy') {
+                entity = new Phaser.Sprite(this.game, 0, 0, 'enemy');
+                entity.tint = 0xAF5A5A;
+            }
+
+            entity.anchor.set(0.5, 0.5);
+            entity.x = entityDef.x * TILE_SIZE + (TILE_SIZE - 10) / 2;
+            entity.y = entityDef.y * TILE_SIZE + (TILE_SIZE - 10) / 2;
+            this.group.addChild(entity);
+
+
+            this.entitySprites[idx] = entity;
+        })
+
+
+        this.player = new Phaser.Sprite(this.game, -800, GROUND_LEVEL - 100, "player");
+        this.player.tint = 0xC4A24D;
+        this.player.width = 50;
+        this.player.height = 100;
+        this.player.velocity = new Phaser.Point(0, 0);
+        this.player.isOnGround = true;
+        this.player.groundLevel = GROUND_LEVEL;
+        this.player.score = 0;
+        this.player.highScore = (localStorage.getItem('high-score') && Number(localStorage.getItem('high-score'))) || 0;
+        updateScore(this.player);
+        this.group.addChild(this.player);
+
+        const glow = effects.createGlowEffect(this.player)
+        util.moveSiblingToChild(glow, this.player);
+        glow.kill();
+
+        const playerClone = this.player.cloneSprite()
+        util.moveSiblingToChild(playerClone, this.player);
+
+
+        this.jumpKey = this.game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+        this.attackKey = this.game.input.keyboard.addKey(Phaser.Keyboard.A);
+
+        this.attackKey.onDown.add(() => {
+            // playerDeath();
+            // effects.createGlowEffect(this.player)
+        })
+
+        this.jumpKey.onDown.add(() => {
+            if (this.isDead) {
+                this.game.state.start('gameplay')
+            }
+        })
+
+       
+    },
+
+    playerDeath() {
+        this.isDead = true;
+        effects.createDeathEffect(this.player);
+    },
+
+    update() {
+
+        if (this.isDead) {
+            if (!this.group.velocityX) this.group.velocityX = -SPEED;
+            const targetX = -this.player.x + 400;
+            this.group.x += (targetX - this.group.x) / 50;
+            // this.group.velocityX = Math.min(this.group.velocityX + 0.5, 0);
+
+            return;
         }
-    });
 
-    if (player.glowEffect && player.glowEffect.alive) {
-        if (Math.floor(Date.now()) % 2 == 0) {
-            player.glowEffect.tint = ((1<<24)*Math.random()|0);
+        this.player.x += SPEED;
+        this.player.groundLevel += Math.sin(this.floor.rotation) * SPEED;
+        this.group.y -= Math.sin(this.floor.rotation) * SPEED;
+        this.group.x = -this.player.x + 100;
+
+        if (!this.player.isOnGround) {
+            if (this.jumpKey.isDown && this.player.jumpSpeed > 0) {
+                this.player.velocity.y -= this.player.jumpSpeed;
+            }
+            this.player.velocity.y += 0.4;
+            this.player.jumpSpeed -= 0.05;
+            this.player.airTime ++;
+        } else {
+            this.player.airTime = 0;
+            this.player.jumpSpeed = 1;
         }
-        // player.glowEffect.alpha = Math.random();
-        // player.glowEffect.scaleXY = (Math.sin(Date.now() / 500) * 0.5 + 0.5) * 1 + 2;
-        centerSpriteAt(player.glowEffect, player.width / 2, player.height / 2);
-        if (player.glowEffect.alpha == 0) {
-            player.glowEffect.kill();
+
+
+
+        if (this.jumpKey.isDown && this.player.isOnGround) {
+            this.player.isOnGround = false;
+            this.player.velocity.y = -5;
+            effects.createPounceEffect(this.player, 0, -1);
         }
-    }
 
+        
+
+
+        const prevY = this.player.y;
+        const newY = this.player.y + this.player.velocity.y;
+
+        const collision = checkCollisions(this.map, prevY, newY, this.player);
+        if (collision.isCollision) {
+            this.player.y = collision.y - this.player.height;
+            this.player.velocity.y = 0;
+            this.player.isOnGround = true;
+            if (collision.tileX) {
+                const tile = this.mapSprites[collision.tileX] && this.mapSprites[collision.tileX][collision.tileY]
+                if (tile) {
+                    effects.createJumpEffect(tile);
+                }
+            }
+        } else {
+            this.player.isOnGround = false;
+        }
+
+        this.player.y += this.player.velocity.y;
+
+
+        this.map.entities.forEach((entityDef, idx) => {
+            const entity = this.entitySprites[idx];
+            if (entity.alive) {
+                if (entityDef.type == 'point') {
+                    if (entity.x > this.player.x && entity.x < this.player.x + this.player.width && 
+                        entity.y > this.player.y && entity.y < this.player.y + this.player.height && entity.alive) {
+                        entity.scaleXY = 2;
+                        effects.createPounceEffectSpin(entity, 0, 0, 3, 1)
+                        effects.createGlowEffect(this.player);
+                        this.player.score ++;
+                        updateScore(this.player);
+                        entity.kill();
+                    } 
+                } else if (entityDef.type == 'enemy') {
+                    entity.scaleXY = (Math.sin(Date.now() / 100) * 0.5 + 0.5) * 0.5 + 0.5
+                    entity.rotation = (t => {
+                        if (Math.sin(t + Math.PI/2) < 0) t += Math.PI
+                        return (Math.sin(t) * 0.5 + 0.5) * Math.PI / 2;
+                    })(Date.now() / 200);
+                    if (entity.x > this.player.x && entity.x < this.player.x + this.player.width && 
+                        entity.y > this.player.y && entity.y < this.player.y + this.player.height) {
+                        entity.tint = 0xffffff;
+                        this.playerDeath();
+                    }
+                }
+            }
+
+        });
+
+        if (this.player.glowEffect && this.player.glowEffect.alive) {
+            if (Math.floor(Date.now()) % 2 == 0) {
+                this.player.glowEffect.tint = ((1<<24)*Math.random()|0);
+            }
+            // this.player.glowEffect.alpha = Math.random();
+            // this.player.glowEffect.scaleXY = (Math.sin(Date.now() / 500) * 0.5 + 0.5) * 1 + 2;
+            util.centerSpriteAt(this.player.glowEffect, this.player.width / 2, this.player.height / 2);
+            if (this.player.glowEffect.alpha == 0) {
+                this.player.glowEffect.kill();
+            }
+        }
+
+
+    },
+
+    render() {
+
+
+    }
 
 }
 
-function render() {
-
-
+function updateScore(entity) {
+    entity.highScore = Math.max(entity.highScore, entity.score);
+    localStorage.setItem('high-score', entity.highScore);
+    document.getElementById('score').innerHTML = entity.score;
+    document.getElementById('high-score').innerHTML = entity.highScore;
 }
 
+var game = new Phaser.Game(800, 600, Phaser.AUTO, 'content', state);
 
-function checkCollisions(map, prevY, newY, entity) {
-
-
-    function pointToTile(p) {
-        return Math.floor(p / TILE_SIZE);
-    }
-    function tileFromPoint(px, py) {
-        const x = pointToTile(px);
-        const y = pointToTile(py);
-        const tile = map.get(x, y);
-        return { x, y, tile };
-    }
-
-    if (entity.width > TILE_SIZE) throw "Entity to wide";
-
-    var collision = { isCollision: false, y: 0, entity: null };
-
-    if (prevY > newY) return collision;
-
-    if (newY >= player.groundLevel - entity.height) {
-
-        collision.isCollision = true;
-        collision.y = player.groundLevel;
-        return collision;
-    }
-
-    const flat = prevY == newY;
-
-    const jumpOn = (x) => (flat || !tileFromPoint(x, prevY + entity.height).tile) &&
-                          tileFromPoint(x, newY + entity.height).tile;
-
-    
-    if (jumpOn(entity.x) || jumpOn(entity.x + entity.width)) {
-        const tileX = pointToTile(player.x + player.width / 2);
-        const tileY = pointToTile(newY + entity.height);
-        collision.isCollision = true;
-        collision.tileX = tileX;
-        collision.tileY = tileY;
-        collision.y = tileY * TILE_SIZE;
-        return collision;
-    }
-
-    return collision;
-
-}
+game.state.add('gameplay', state);
 
 
-function createBitmap(colour, width, height) {
-    var data = game.add.bitmapData(width, height);
 
-    data.ctx.beginPath();
-    data.ctx.rect(0, 0, width, height);
-    data.ctx.fillStyle = colour;
-    data.ctx.fill();
-
-    return data;
-}
